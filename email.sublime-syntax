@@ -1,0 +1,74 @@
+%YAML 1.2
+---
+# See: http://www.sublimetext.com/docs/3/syntax.html
+# Scopes: https://www.sublimetext.com/docs/3/scope_naming.html
+# Naming: https://macromates.com/manual/en/language_grammars#naming_conventions
+name: Email
+file_extensions:
+  - eml
+  - msg
+  - mbx
+  - mboxz
+scope: source.eml
+contexts:
+  main:
+    # Security Headers
+    - match: "(?ix)^((.*)?-Signature|Authentication-results|DomainKey-Signature|Received-SPF)(:)"
+      scope: invalid
+
+    # Custom Headers
+    #   X-Mailer:
+    - match: "(?ix)^x-([a-z0-9-]+)(:)"
+      scope: storage
+
+    # Headers (https://en.wikipedia.org/wiki/Email#Message_header)
+    #   From:
+    #   MIME-Version:
+    - match: "(?x)^([A-Z][a-zA-Z0-9-]+)(:)"
+      scope: keyword.control
+
+    # Email addresses
+    #   john.doe@example.com
+    #   <john.doe@example.com>
+    - match: "(?ix)((<?) [-a-z0-9.:_]+@[-a-zA-Z0-9.]+ (>?))"
+      scope: string.underline.link
+
+    # Content-Transfer-Encoding: base64
+    #   VGhpcyB0ZXh0IGlzIGVuY29kZWQsIEl0IHNlZW1zIHdlaXJkLg==
+    - match: "(?x) ^ (?:[A-Za-z0-9+/]{4})+ (?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$"
+      scope: comment
+
+    # Content-Transfer-Encoding: quoted-printable
+    - match: "(?x)=([0-9a-fA-F]{2})"
+      scope: variable.other
+
+    # Encoded-words (https://www.ietf.org/rfc/rfc2047.txt)
+    - match: "(?i)=\\?(utf-8|windows-1251)\\?B\\?(.*)\\?="
+      scope: variable.other
+
+    # Frontiers
+    #   Content-Type: multipart/mixed; boundary=frontier
+    #   --frontier
+    #   --frontier
+    #   --frontier--
+    - match: "(?ix)boundary=(.+)"
+      scope: constant.character
+
+    - match: "(?ix)^--[a-zA-Z0-9-=_?:]+(--)?$"
+      scope: constant.character
+
+    # HTML (https://github.com/sublimehq/Packages/blob/master/HTML/HTML.sublime-syntax)
+    - match: "^\\s*(?=<)"
+      push: Packages/HTML/HTML.sublime-syntax
+      with_prototype:
+        - match: "(?<=>)\\s*$"
+          pop: true
+        - match: "[.@\"]"
+          pop: false
+
+    # JavaScript (https://github.com/sublimehq/Packages/blob/master/JavaScript/JavaScript.sublime-syntax)
+    - match: <script>
+      push: Packages/JavaScript/JavaScript.sublime-syntax
+      with_prototype:
+        - match: (?=</script>)
+          pop: true
