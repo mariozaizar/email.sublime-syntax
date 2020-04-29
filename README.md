@@ -1,3 +1,5 @@
+![social](https://raw.githubusercontent.com/mariozaizar/email.sublime-syntax/master/demo/social.png)
+
 [![GitHub issues](https://img.shields.io/github/issues/mariozaizar/email.sublime-syntax.svg)](https://github.com/mariozaizar/email.sublime-syntax/issues)
 [![GitHub license](https://img.shields.io/badge/license-MIT-blue.svg)](https://raw.githubusercontent.com/mariozaizar/email.sublime-syntax/master/LICENSE.md)
 
