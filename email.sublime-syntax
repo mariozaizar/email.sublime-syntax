@@ -1,8 +1,6 @@
 %YAML 1.2
 ---
-# See: http://www.sublimetext.com/docs/3/syntax.html
-# Scopes: https://www.sublimetext.com/docs/3/scope_naming.html
-# Naming: https://macromates.com/manual/en/language_grammars#naming_conventions
+
 name: Email
 file_extensions:
   - eml
@@ -43,8 +41,12 @@ contexts:
       scope: variable.other
 
     # Encoded-words (https://www.ietf.org/rfc/rfc2047.txt)
-    - match: "(?i)=\\?(utf-8|windows-1251)\\?B\\?(.*)\\?="
-      scope: variable.other
+    - match: '(?i)=\?(utf-8|windows-1251)\?B\\?(.*)\?='
+      scope: comment
+
+    # Timestamps (https://tools.ietf.org/html/rfc5322#section-3.3)
+    - match: '[a-zA-Z]{3},.*[+-][0-9]{4}\s(.{4}\))?'
+      scope: variable.language
 
     # Frontiers
     #   Content-Type: multipart/mixed; boundary=frontier
