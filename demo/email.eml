@@ -18,9 +18,9 @@ Content-Type: text/html
 <html>
 <head>
   <title>Airmail 1.5 for iOS</title>
-  <style type="text/css">* {
+  <style type="text/css">
   * {
-  font-family:Roboto, "Helvetica Neue", Helvetica, Arial, sans-serif;
+    font-family: Roboto, "Helvetica Neue", Helvetica, Arial, sans-serif;
   }
   </style>
 </head>
