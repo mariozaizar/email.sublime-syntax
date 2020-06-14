@@ -252,15 +252,8 @@ contexts:
     - meta_content_scope: meta.region.body.email
     - include: pop-before-boundary
     - match: ''
-      push: scope:text.html.basic
-      with_prototype:
-        - match: ^(?=--[a-zA-Z0-9-=_?:]+(--)?$)
-          pop: true
-        - match: \b=3[dD](?=['"])
-          scope: constant.character.escape.eml
-          push:
-            - scope:text.html.basic#tag-generic-attribute-value
-        - include: quoted-printable
+      embed: html-with-quoted-printable
+      escape: ^(?=--[a-zA-Z0-9-=_?:]+(--)?$)
 
   body-content-quoted-printable:
     - meta_content_scope: meta.region.body.email
@@ -285,6 +278,17 @@ contexts:
     - meta_content_scope: meta.region.body.email
     - include: pop-before-boundary
     - include: base64-line
+
+  html-with-quoted-printable:
+    - match: ''
+      push: scope:text.html.basic
+      with_prototype:
+        # Unbreak QP version of `=` in attributes
+        - match: \b=3[dD](?=['"])
+          scope: constant.character.escape.eml punctuation.separator.key-value.html
+          push:
+            - scope:text.html.basic#tag-generic-attribute-value
+        - include: quoted-printable
 
   base64-line:
     # Content-Transfer-Encoding: base64
@@ -358,7 +362,8 @@ contexts:
       push: maybe-timestamp-day
 
   ignore-qp-newline-pop-nonws:
-    - match: =$
+    - match: =\n
+      scope: punctuation.separator.continuation.eml
     - match: (?=\S)
       pop: true
 
