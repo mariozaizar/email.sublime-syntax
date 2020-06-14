@@ -123,17 +123,17 @@ contexts:
         - include: mime-type
 
   mime-type:
-    - match: \b(?:text|application|multipart|message|image)/\b[a-z-]+\b
+    - match: \b(?:text|application|multipart|message|image)/\b[a-z\d-]+\b
       scope: entity.name.enum.eml
 
   body-block:
     - meta_content_scope: meta.block.body.eml
-    - match: ^--({{boundary_name}})--$
+    - match: ^--({{boundary_name}})--(?:\n|$)
       scope: punctuation.terminator.eml
       captures:
         1: variable.language.eml
     # Body with boundaries
-    - match: ^--({{boundary_name}})$
+    - match: ^--({{boundary_name}})(?:\n|$)
       scope: punctuation.separator.sequence.eml
       captures:
         1: variable.language.eml
