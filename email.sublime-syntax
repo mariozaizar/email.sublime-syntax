@@ -237,6 +237,12 @@ contexts:
   expect-body-instructions-quoted-printable:
     - match: ^\n$
       set: body-content-quoted-printable
+    - match: ^((?i:Content-Type))(:)\s*(text/(?:watch-)?html)\b
+      captures:
+        1: meta.mapping.key.header.eml keyword.other.eml
+        2: punctuation.separator.mapping.key-value.eml
+        3: entity.name.enum.eml
+      set: [expect-body-instructions-html-quoted-printable, header-value]
     - include: generic-header-kvp
 
   expect-body-instructions-html-quoted-printable:
