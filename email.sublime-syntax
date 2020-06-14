@@ -144,18 +144,79 @@ contexts:
 
   expect-body-instructions:
     - match: ^\n$
-      set: body-content
+      set: body-content-default
     - match: ^((?i:Content-Type))(:)\s(image/\w+)\b
       captures:
         1: meta.mapping.key.header.eml keyword.other.eml
         2: punctuation.separator.mapping.key-value.eml
         3: entity.name.enum.eml
       set: [expect-body-instructions-image, header-value]
+    - match: ^((?i:Content-Type))(:)\s(message/[\w-]+)\b
+      captures:
+        1: meta.mapping.key.header.eml keyword.other.eml
+        2: punctuation.separator.mapping.key-value.eml
+        3: entity.name.enum.eml
+      set: [expect-body-instructions-headers, header-value]
+    - match: ^((?i:Content-Type))(:)\s(text/(?:watch-)?html)\b
+      captures:
+        1: meta.mapping.key.header.eml keyword.other.eml
+        2: punctuation.separator.mapping.key-value.eml
+        3: entity.name.enum.eml
+      set: [expect-body-instructions-html-noencoding, header-value]
+    - match: ^((?i:Content-Transfer-Encoding))(:)\squoted-printable\b
+      captures:
+        1: meta.mapping.key.header.eml keyword.other.eml
+        2: punctuation.separator.mapping.key-value.eml
+      set: [expect-body-instructions-quoted-printable, header-value]
+    - include: become-expect-base64
+    - include: generic-header-kvp
+
+  become-expect-base64:
+    - match: ^((?i:Content-Transfer-Encoding))(:)\sbase64\b
+      captures:
+        1: meta.mapping.key.header.eml keyword.other.eml
+        2: punctuation.separator.mapping.key-value.eml
+      set: [expect-body-instructions-base64, header-value]
+
+  expect-body-instructions-base64:
+    - match: ^\n$
+      set: body-content-base64
     - include: generic-header-kvp
 
   expect-body-instructions-image:
     - match: ^\n$
       set: body-content-image
+    - include: generic-header-kvp
+
+  expect-body-instructions-headers:
+    - match: ^\n$
+      set: body-content-headers
+    - include: generic-header-kvp
+
+  expect-body-instructions-html-noencoding:
+    - match: ^\n$
+      set: body-content-html
+    - include: become-expect-base64
+    - match: ^((?i:Content-Transfer-Encoding))(:)\squoted-printable\b
+      captures:
+        1: meta.mapping.key.header.eml keyword.other.eml
+        2: punctuation.separator.mapping.key-value.eml
+      set: [expect-body-instructions-html-quoted-printable, header-value]
+    - include: generic-header-kvp
+
+  expect-body-instructions-quoted-printable:
+    - match: ^\n$
+      set: body-content-quoted-printable
+    - include: generic-header-kvp
+
+  expect-body-instructions-html-quoted-printable:
+    - match: ^\n$
+      set: body-content-html-quoted-printable
+    - include: generic-header-kvp
+
+  body-content-headers:
+    - meta_content_scope: meta.region.body.email
+    - include: pop-before-boundary
     - include: generic-header-kvp
 
   body-content-image:
@@ -164,27 +225,61 @@ contexts:
     - match: ^{{base64_string}}$\n?
       scope: meta.block.base64.image.eml string.unquoted.eml
 
-  body-content:
+  body-content-html:
+    - meta_content_scope: meta.region.body.email
+    - include: pop-before-boundary
+    - match: ''
+      embed: scope:text.html.basic
+      escape: ^(?=--[a-zA-Z0-9-=_?:]+(--)?$)
+
+  body-content-html-quoted-printable:
+    - meta_content_scope: meta.region.body.email
+    - include: pop-before-boundary
+    - match: ''
+      push: scope:text.html.basic
+      with_prototype:
+        - match: ^(?=--[a-zA-Z0-9-=_?:]+(--)?$)
+          pop: true
+        - match: \b=3[dD](?=['"])
+          scope: constant.character.escape.eml
+          push:
+            - scope:text.html.basic#tag-generic-attribute-value
+        - include: quoted-printable
+
+  body-content-quoted-printable:
     - meta_content_scope: meta.region.body.email
     - include: pop-before-boundary
     - include: encoded-words
     - include: quoted-printable
-
-    # HTML
-    - match: ^\s*(?=<)
-      embed: scope:text.html.basic
-      escape: ^(?=--[a-zA-Z0-9-=_?:]+(--)?$)
-
-    # Plaintext replies indented with `>>>`
-    - match: ^>{1,8}
-      scope: punctuation.section.block.begin.eml
-
+    - include: plaintext-blockquote
     - include: common
 
+  body-content-default:
+    - meta_content_scope: meta.region.body.email
+    - include: pop-before-boundary
+    - include: encoded-words
+    - include: plaintext-blockquote
+    - include: common
+    # Including Base64 here is a hack to avoid scanning the
+    #   real headers for type and encoding information. It's
+    #   lots easier to assume all messages are multipart.
+    - include: base64-line
+
+  body-content-base64:
+    - meta_content_scope: meta.region.body.email
+    - include: pop-before-boundary
+    - include: base64-line
+
+  base64-line:
     # Content-Transfer-Encoding: base64
     #   VGhpcyB0ZXh0IGlzIGVuY29kZWQsIEl0IHNlZW1zIHdlaXJkLg==
     - match: ^{{base64_string}}$\n?
       scope: meta.block.base64.eml string.unquoted.eml
+
+  plaintext-blockquote:
+    # Plaintext replies indented with `>>>`
+    - match: ^>{1,8}
+      scope: punctuation.section.block.begin.eml
 
   quoted-printable:
     - match: =[0-9a-fA-F]{2}

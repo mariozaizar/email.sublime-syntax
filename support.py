@@ -37,6 +37,7 @@ class EmailViewListener(sublime_plugin.ViewEventListener):
         if is_image:
             hover_text = '<img src="data:image/jpeg;base64, {}" />'.format(
                 base64_text)
+            # TODO: Add link to export image.
         else:
             try:
                 hover_text = b64decode(str.encode(base64_text)).decode()
