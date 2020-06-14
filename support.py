@@ -26,20 +26,26 @@ class EmailViewListener(sublime_plugin.ViewEventListener):
              self.view.match_selector(point, 'meta.block.base64'))):
             return
 
+        is_image = self.view.match_selector(point, 'meta.block.base64.image')
+
         expression_region = next(
             r for r in self.view.find_by_selector('meta.block.base64')
             if r.contains(point))
 
         base64_text = self.view.substr(expression_region)
 
-        try:
-            hover_text = b64decode(str.encode(base64_text)).decode()
-            hover_lines = html.escape(hover_text).split('\n')[:50]
-            hover_text = '\n'.join(self.format_hover_line(line)
-                                   for line in hover_lines)
-            # TODO: Add link to decode whole block in new `view`.
-        except Exception as e:
-            hover_text = 'Could not decode Base 64 to text'
+        if is_image:
+            hover_text = '<img src="data:image/jpeg;base64, {}" />'.format(
+                base64_text)
+        else:
+            try:
+                hover_text = b64decode(str.encode(base64_text)).decode()
+                hover_lines = html.escape(hover_text).split('\n')[:50]
+                hover_text = '\n'.join(self.format_hover_line(line)
+                                       for line in hover_lines)
+                # TODO: Add link to decode whole block in new `view`.
+            except Exception as e:
+                hover_text = 'Could not decode Base 64 to text'
 
         html_text = '''
             <body style="width: 500px;">

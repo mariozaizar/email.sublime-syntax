@@ -145,7 +145,24 @@ contexts:
   expect-body-instructions:
     - match: ^\n$
       set: body-content
+    - match: ^((?i:Content-Type))(:)\s(image/\w+)\b
+      captures:
+        1: meta.mapping.key.header.eml keyword.other.eml
+        2: punctuation.separator.mapping.key-value.eml
+        3: entity.name.enum.eml
+      set: [expect-body-instructions-image, header-value]
     - include: generic-header-kvp
+
+  expect-body-instructions-image:
+    - match: ^\n$
+      set: body-content-image
+    - include: generic-header-kvp
+
+  body-content-image:
+    - meta_content_scope: meta.region.body.email
+    - include: pop-before-boundary
+    - match: ^{{base64_string}}$\n?
+      scope: meta.block.base64.image.eml string.unquoted.eml
 
   body-content:
     - meta_content_scope: meta.region.body.email
