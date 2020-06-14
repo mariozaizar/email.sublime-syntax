@@ -289,9 +289,15 @@ contexts:
     - include: encoded-words
     - include: plaintext-blockquote
     - include: common
-    # Including Base64 here is a hack to avoid scanning the
-    #   real headers for type and encoding information. It's
-    #   lots easier to assume all messages are multipart.
+
+    # Hacks to avoid toggling state while scanning message headers.
+    #   It's easier to assume `multipart/*`.
+    - match: ^(?=<\?xml\b)
+      embed: scope:text.xml
+      escape: ^(?=--[a-zA-Z0-9-=_?:]+(--)?$)
+    - match: ^(?=(?:<html|<!DOCTYPE html)\b)
+      embed: scope:text.html.basic
+      escape: ^(?=--[a-zA-Z0-9-=_?:]+(--)?$)
     - include: base64-line
 
   body-content-base64:
@@ -329,6 +335,7 @@ contexts:
 
   encoded-words:
     # https://www.ietf.org/rfc/rfc2047.txt
+
     # Quoted Printable
     # =?iso-8859-1?q?this=20is=20some=20text?=
     - match: (=\?)(?:(utf-8|windows-1251|iso-[a-z0-9-]+\b)(\?))?([qQ])(\?)
@@ -346,6 +353,7 @@ contexts:
           scope: invalid.illegal.eml
         - include: quoted-printable
         # Is trailing newline illegal?
+
     # Base 64
     # =?iso-8859-1?b?PGh0bWw+CiAg?=
     - match: (=\?)(utf-8|windows-1251|iso-[a-z0-9-]+\b)(\?)([bB])(\?)
