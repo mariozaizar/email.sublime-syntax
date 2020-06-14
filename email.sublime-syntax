@@ -364,6 +364,10 @@ contexts:
       captures:
         1: punctuation.separator.sequence.eml
       push: maybe-timestamp-day
+    # This one is a little hinky because it attempts to find a timestamp
+    #   when there is a 0-31 number as the last text on a line. Until ST4,
+    #   we don't have the ability to backtrack when the timestamp doesn't
+    #   continue on the next line.
     - match: \b(?=(?:0?[1-9]|[12]\d|3[01])(?:\s{{month3}}|\s?=?$))
       push: maybe-timestamp-day
 
