@@ -33,7 +33,7 @@ variables:
       (?:{{base64_char}}{2}==|
          {{base64_char}}{3}=)?
     )
-  boundary_name: (?:[\w=?:-]+)
+  boundary_name: (?:[\w=?:-]*[a-zA-Z0-9][\w=?:-]*)
   day3: (?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)
   month3: (?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)
 
