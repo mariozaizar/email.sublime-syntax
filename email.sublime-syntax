@@ -63,12 +63,20 @@ contexts:
           pop: true
 
     # Security Headers
-    - match: ^((?:\S+-)?Signature|Authentication-Results|DomainKey-Signature|Received-SPF)(:)"
+    - match: |-
+        ^(?x:(
+          ARC-Seal|
+          (?:ARC-)?(?:Authentication-Results)|
+          ([xX]-)?(?:\w+-)*(?:DomainKey|DKIM|Message)-Signature|
+          Received-SPF
+        ))(:)
       captures:
         1: meta.mapping.key.header.eml support.function.eml
-        2: punctuation.separator.mapping.key-value.eml
+        2: variable.annotation.eml
+        3: punctuation.separator.mapping.key-value.eml
       push: header-value
 
+    # Generic headers
     - include: generic-header-kvp
 
   generic-header-kvp:
