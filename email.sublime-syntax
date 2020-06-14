@@ -81,7 +81,7 @@ contexts:
 
   generic-header-kvp:
     # https://en.wikipedia.org/wiki/Email#Message_header
-    - match: ^((?i:(x-)?[a-z0-9-]+))(:)
+    - match: ^((?i:(x-)?[a-z0-9-]+))\b(:)
       captures:
         1: meta.mapping.key.header.eml keyword.other.eml
         2: variable.annotation.eml
@@ -169,25 +169,25 @@ contexts:
   expect-body-instructions:
     - match: ^\n$
       set: body-content-default
-    - match: ^((?i:Content-Type))(:)\s(image/\w+)\b
+    - match: ^((?i:Content-Type))(:)\s*(image/\w+)\b
       captures:
         1: meta.mapping.key.header.eml keyword.other.eml
         2: punctuation.separator.mapping.key-value.eml
         3: entity.name.enum.eml
       set: [expect-body-instructions-image, header-value]
-    - match: ^((?i:Content-Type))(:)\s(message/[\w-]+)\b
+    - match: ^((?i:Content-Type))(:)\s*(message/[\w-]+)\b
       captures:
         1: meta.mapping.key.header.eml keyword.other.eml
         2: punctuation.separator.mapping.key-value.eml
         3: entity.name.enum.eml
       set: [expect-body-instructions-headers, header-value]
-    - match: ^((?i:Content-Type))(:)\s(text/(?:watch-)?html)\b
+    - match: ^((?i:Content-Type))(:)\s*(text/(?:watch-)?html)\b
       captures:
         1: meta.mapping.key.header.eml keyword.other.eml
         2: punctuation.separator.mapping.key-value.eml
         3: entity.name.enum.eml
       set: [expect-body-instructions-html-noencoding, header-value]
-    - match: ^((?i:Content-Transfer-Encoding))(:)\squoted-printable\b
+    - match: ^((?i:Content-Transfer-Encoding))(:)\s*quoted-printable\b
       captures:
         1: meta.mapping.key.header.eml keyword.other.eml
         2: punctuation.separator.mapping.key-value.eml
@@ -196,7 +196,7 @@ contexts:
     - include: generic-header-kvp
 
   become-expect-base64:
-    - match: ^((?i:Content-Transfer-Encoding))(:)\sbase64\b
+    - match: ^((?i:Content-Transfer-Encoding))(:)\s*base64\b
       captures:
         1: meta.mapping.key.header.eml keyword.other.eml
         2: punctuation.separator.mapping.key-value.eml
@@ -205,7 +205,7 @@ contexts:
   expect-body-instructions-base64:
     - match: ^\n$
       set: body-content-base64
-    - match: ^((?i:Content-Type))(:)\s(image/\w+)\b
+    - match: ^((?i:Content-Type))(:)\s*(image/\w+)\b
       captures:
         1: meta.mapping.key.header.eml keyword.other.eml
         2: punctuation.separator.mapping.key-value.eml
@@ -227,7 +227,7 @@ contexts:
     - match: ^\n$
       set: body-content-html
     - include: become-expect-base64
-    - match: ^((?i:Content-Transfer-Encoding))(:)\squoted-printable\b
+    - match: ^((?i:Content-Transfer-Encoding))(:)\s*quoted-printable\b
       captures:
         1: meta.mapping.key.header.eml keyword.other.eml
         2: punctuation.separator.mapping.key-value.eml
