@@ -46,7 +46,9 @@ contexts:
     - meta_content_scope: meta.block.header.eml
     - match: ^(?=\r?\n)
       set: body-block
+    - include: headers
 
+  headers:
     # Special headers
     - match: ^((?i:From|To|Cc|Bcc|Date))(:)
       captures:
@@ -253,7 +255,7 @@ contexts:
   body-content-headers:
     - meta_content_scope: meta.region.body.email
     - include: pop-before-boundary
-    - include: generic-header-kvp
+    - include: headers
 
   body-content-image:
     - meta_content_scope: meta.region.body.email
