@@ -80,10 +80,24 @@ contexts:
         3: punctuation.separator.mapping.key-value.eml
       push: header-value
 
+  header-comment:
+    # https://tools.ietf.org/html/rfc5322#appendix-A.5
+    - match: \(
+      scope: punctuation.definition.comment.begin.eml
+      push:
+        - meta_scope: comment.block.eml
+        - match: \\[()]
+          scope: constant.character.escape.eml
+        - match: \)
+          scope: punctuation.definition.comment.end.eml
+          pop: true
+        - include: header-comment
+
   header-value:
     - meta_content_scope: meta.mapping.value.header.eml
     - match: ^(?=\S|$)
       pop: true
+    - include: header-comment
     - include: common
     - match: \b([a-zA-Z0-9-]+)\b(=)(?!\s|=)
       captures:
@@ -116,6 +130,8 @@ contexts:
       scope: punctuation.definition.string.begin.eml
       push:
         - meta_scope: string.quoted.double.eml
+        - match: \\"
+          scope: constant.character.escape.eml
         - match: '"'
           scope: punctuation.definition.string.end.eml
           pop: true
