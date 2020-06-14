@@ -221,10 +221,66 @@ contexts:
 
   timestamps:
     # https://tools.ietf.org/html/rfc5322#section-3.3
-    - match: '{{day3}},.*[+-][0-9]{4}\s(?:.{4}\))?'
-      scope: constant.numeric.date-time.eml
-    - match: '\d{1,2} {{month3}}.*[+-][0-9]{4}\s(?:.{4}\))?'
-      scope: constant.numeric.date-time.eml
+    - match: \b{{day3}}(,)(?=\s\d{1,2}|$)
+      captures:
+        1: punctuation.separator.sequence.eml
+      set: maybe-timestamp-day
+    - match: \b(?=(?:[1-9]|[12]\d|3[01])(?:\s{{month3}}|$))
+      set: maybe-timestamp-day
+
+  maybe-timestamp-day:
+    - meta_scope: constant.numeric.date-time.eml
+    - match: \b(?:[1-9]|[12]\d|3[01])(?=\s{{month3}}|$)
+      set: in-timestamp-month
+    - match: (?=\S)
+      pop: true
+
+  in-timestamp-month:
+    - meta_scope: constant.numeric.date-time.eml
+    - match: \b{{month3}}\b
+      set: in-timestamp-year
+    - match: (?=\S)
+      pop: true
+
+  in-timestamp-year:
+    - meta_scope: constant.numeric.date-time.eml
+    - match: \b(?:19\d{2}|20\d{2})\b
+      set: in-timestamp-time-of-day
+    - match: (?=\S)
+      pop: true
+
+  in-timestamp-time-of-day:
+    - meta_scope: constant.numeric.date-time.eml
+    - match: |-
+        (?x:
+          (?:[01]\d|2[0-3])  # hour
+          (:)
+          (?:[0-5]\d)        # minute
+          (?:
+            (:)
+            (?:[0-5]\d)      # second (optional)
+            (?:
+              (\.)
+              \d{1,4}        # fractional second (not RFC5322)
+            )?
+          )?
+        )
+      captures:
+        1: punctuation.separator.sequence.eml
+        2: punctuation.separator.sequence.eml
+        3: punctuation.separator.decimal.eml
+      set: in-timestamp-zone
+    - match: (?=\S)
+      pop: true
+
+  in-timestamp-zone:
+    - meta_scope: constant.numeric.date-time.eml
+    - match: ([+-])(?:0\d{3}|1[0-2]\d{2})
+      captures:
+        1: keyword.operator.arithmetic.eml
+      pop: true
+    - match: (?=\S)
+      pop: true
 
   ip-addresses:
     - match: '(\[){{ipv4}}(\])'
