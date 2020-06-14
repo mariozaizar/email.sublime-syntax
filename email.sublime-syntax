@@ -338,7 +338,7 @@ contexts:
       captures:
         1: punctuation.separator.sequence.eml
       push: maybe-timestamp-day
-    - match: \b(?=(?:[1-9]|[12]\d|3[01])(?:\s{{month3}}|\s?=?$))
+    - match: \b(?=(?:0?[1-9]|[12]\d|3[01])(?:\s{{month3}}|\s?=?$))
       push: maybe-timestamp-day
 
   ignore-qp-newline-pop-nonws:
@@ -348,7 +348,7 @@ contexts:
 
   maybe-timestamp-day:
     - meta_content_scope: constant.numeric.date-time.eml
-    - match: \b(?:[1-9]|[12]\d|3[01])(?=\s{{month3}}|\s?=?$)
+    - match: \b(?:0?[1-9]|[12]\d|3[01])(?=\s{{month3}}|\s?=?$)
       set: in-timestamp-month
     - include: ignore-qp-newline-pop-nonws
 
