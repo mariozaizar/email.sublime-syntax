@@ -1,76 +1,504 @@
 %YAML 1.2
 ---
-
 name: Email
 file_extensions:
   - eml
   - msg
   - mbx
   - mboxz
-scope: source.eml
+scope: text.eml
+
+variables:
+  zero_to_255: (?:(?:25[0-5])|(?:2[0-4][0-9])|(?:1[0-9][0-9])|(?:[1-9][0-9])|[0-9])
+  ipv4: \b(?:(?:{{zero_to_255}}\.){3}{{zero_to_255}})\b
+  ipv6: |-
+    (?xi:
+      (?:::(?:ffff(?::0{1,4}){0,1}:){0,1}{{ipv4}})          # ::255.255.255.255  ::ffff:255.255.255.255  ::ffff:0:255.255.255.255 (IPv4-mapped IPv6 addresses and IPv4-translated addresses)
+      |(?:(?:[0-9a-f]{1,4}:){1,4}:{{ipv4}})                 # 2001:db8:3:4::192.0.2.33  64:ff9b::192.0.2.33                       (IPv4-Embedded IPv6 Address)
+      |(?:fe80:(?::[0-9a-f]{1,4}){0,4}%[0-9a-z]{1,})        # fe80::7:8%eth0     fe80::7:8%1                                      (link-local IPv6 addresses with zone index)
+      |(?:(?:[0-9a-f]{1,4}:){7,7}    [0-9a-f]{1,4})         # 1:2:3:4:5:6:7:8
+      |   (?:[0-9a-f]{1,4}:      (?::[0-9a-f]{1,4}){1,6})   # 1::3:4:5:6:7:8     1::3:4:5:6:7:8   1::8
+      |(?:(?:[0-9a-f]{1,4}:){1,2}(?::[0-9a-f]{1,4}){1,5})   # 1::4:5:6:7:8       1:2::4:5:6:7:8   1:2::8
+      |(?:(?:[0-9a-f]{1,4}:){1,3}(?::[0-9a-f]{1,4}){1,4})   # 1::5:6:7:8         1:2:3::5:6:7:8   1:2:3::8
+      |(?:(?:[0-9a-f]{1,4}:){1,4}(?::[0-9a-f]{1,4}){1,3})   # 1::6:7:8           1:2:3:4::6:7:8   1:2:3:4::8
+      |(?:(?:[0-9a-f]{1,4}:){1,5}(?::[0-9a-f]{1,4}){1,2})   # 1::7:8             1:2:3:4:5::7:8   1:2:3:4:5::8
+      |(?:(?:[0-9a-f]{1,4}:){1,6}   :[0-9a-f]{1,4})         # 1::8               1:2:3:4:5:6::8   1:2:3:4:5:6::8
+      |(?:(?:[0-9a-f]{1,4}:){1,7}   :)                      # 1::                                 1:2:3:4:5:6:7::
+      |(?::(?:(?::[0-9a-f]{1,4}){1,7}|:))                   # ::2:3:4:5:6:7:8    ::2:3:4:5:6:7:8  ::8       ::
+    )(?![0-9A-Za-z:])
+  base64_char: '[0-9A-Za-z+/]'
+  base64_string: |-
+    (?x:
+      (?:{{base64_char}}{4})+
+      (?:{{base64_char}}{2}==|
+         {{base64_char}}{3}=)?
+    )
+  boundary_name: (?:[\w=?:-]*[a-zA-Z0-9][\w=?:-]*)
+  day3: (?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)
+  month3: (?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)
+
 contexts:
   main:
+    - match: ''
+      set: header-block
+
+  header-block:
+    - meta_content_scope: meta.block.header.eml
+    - match: ^(?=\r?\n)
+      set: body-block
+    - include: headers
+
+  headers:
+    # Special headers
+    - match: ^((?i:From|To|Cc|Bcc|Date))(:)
+      captures:
+        1: meta.mapping.key.header.eml entity.name.label.eml
+        2: punctuation.separator.mapping.key-value.eml
+      push: header-value
+    - match: ^(Subject)(:)[ \t]*
+      captures:
+        1: meta.mapping.key.header.eml entity.name.label.eml
+        2: punctuation.separator.mapping.key-value.eml
+      push:
+        - meta_content_scope: meta.mapping.value.header.eml entity.name.class.eml
+        - match: ^(?=\S|$)
+          pop: true
+
     # Security Headers
-    - match: "(?ix)^((.*)?-Signature|Authentication-results|DomainKey-Signature|Received-SPF)(:)"
-      scope: invalid
+    - match: |-
+        ^(?x:(
+          ARC-Seal|
+          (?:ARC-)?(?:Authentication-Results)|
+          ([xX]-)?(?:\w+-)*(?:DomainKey|DKIM|Message)-Signature|
+          Received-SPF
+        ))(:)
+      captures:
+        1: meta.mapping.key.header.eml support.function.eml
+        2: variable.annotation.eml
+        3: punctuation.separator.mapping.key-value.eml
+      push: header-value
 
-    # Custom Headers
-    #   X-Mailer:
-    - match: "(?ix)^x-([a-z0-9-]+)(:)"
-      scope: storage
+    # Generic headers
+    - include: generic-header-kvp
 
-    # Headers (https://en.wikipedia.org/wiki/Email#Message_header)
-    #   From:
-    #   MIME-Version:
-    - match: "(?x)^([A-Z][a-zA-Z0-9-]+)(:)"
-      scope: keyword.control
+  generic-header-kvp:
+    # https://en.wikipedia.org/wiki/Email#Message_header
+    - match: ^((?i:(x-)?[a-z0-9-]+))\b(:)
+      captures:
+        1: meta.mapping.key.header.eml keyword.other.eml
+        2: variable.annotation.eml
+        3: punctuation.separator.mapping.key-value.eml
+      push: header-value
 
-    # Email addresses
-    #   john.doe@example.com
-    #   <john.doe@example.com>
-    - match: "(?ix)((<?) [-a-z0-9.:_]+@[-a-zA-Z0-9.]+ (>?))"
-      scope: string.underline.link
+  header-comment:
+    # https://tools.ietf.org/html/rfc5322#appendix-A.5
+    - match: \(
+      scope: punctuation.definition.comment.begin.eml
+      push:
+        - meta_scope: comment.block.eml
+        - match: \\[()]
+          scope: constant.character.escape.eml
+        - match: \)
+          scope: punctuation.definition.comment.end.eml
+          pop: true
+        - include: header-comment
 
+  header-value:
+    - meta_content_scope: meta.mapping.value.header.eml
+    - match: ^(?=\S|$)
+      pop: true
+    - include: header-comment
+    - include: common
+    - match: \b([a-zA-Z0-9-]+)\b(=)(?!\s|=)
+      captures:
+        1: variable.other.readwrite.eml
+        2: keyword.operator.assignment.eml
+      push:
+        - match: (?=[\s;,])
+          pop: true
+        - include: string-double-quote
+        - include: header-sub-values
+    - match: ;
+      scope: punctuation.separator.sequence.eml
+    - include: string-double-quote
+    - include: mime-type
+
+  header-sub-values:
+    - match: (?:\b|\B-)\d+(\.)\d+(?=[\s;"])
+      scope: constant.numeric.float.eml
+      captures:
+        1: punctuation.separator.decimal.eml
+    - match: (?:\b|\B-)\d+(?=[\s;"])
+      scope: constant.numeric.integer.eml
+    - include: common
+    - include: mime-type
+    - match: '[^\s;,]+'
+      scope: string.unquoted.eml
+
+  string-double-quote:
+    - match: '"'
+      scope: punctuation.definition.string.begin.eml
+      push:
+        - meta_scope: string.quoted.double.eml
+        - match: \\"
+          scope: constant.character.escape.eml
+        - match: '"'
+          scope: punctuation.definition.string.end.eml
+          pop: true
+        - include: common
+        - include: mime-type
+
+  mime-type:
+    - match: \b(?:text|application|multipart|message|image)/\b[a-z\d-]+\b
+      scope: entity.name.enum.eml
+
+  body-block:
+    - meta_content_scope: meta.block.body.eml
+    - match: ^--({{boundary_name}})--(?:\n|$)
+      scope: punctuation.terminator.eml
+      captures:
+        1: variable.language.eml
+    # Body with boundaries
+    - match: ^--({{boundary_name}})(?:\n|$)
+      scope: punctuation.separator.sequence.eml
+      captures:
+        1: variable.language.eml
+      push: expect-body-instructions
+    # Single-block body
+    - match: ''
+      push: expect-body-instructions
+
+  expect-body-instructions:
+    - match: ^\n$
+      set: body-content-default
+    - match: ^((?i:Content-Type))(:)\s*(image/\w+)\b
+      captures:
+        1: meta.mapping.key.header.eml keyword.other.eml
+        2: punctuation.separator.mapping.key-value.eml
+        3: entity.name.enum.eml
+      set: [expect-body-instructions-image, header-value]
+    - match: ^((?i:Content-Type))(:)\s*(message/[\w-]+)\b
+      captures:
+        1: meta.mapping.key.header.eml keyword.other.eml
+        2: punctuation.separator.mapping.key-value.eml
+        3: entity.name.enum.eml
+      set: [expect-body-instructions-headers, header-value]
+    - match: ^((?i:Content-Type))(:)\s*(text/(?:watch-)?html)\b
+      captures:
+        1: meta.mapping.key.header.eml keyword.other.eml
+        2: punctuation.separator.mapping.key-value.eml
+        3: entity.name.enum.eml
+      set: [expect-body-instructions-html-noencoding, header-value]
+    - match: ^((?i:Content-Transfer-Encoding))(:)\s*quoted-printable\b
+      captures:
+        1: meta.mapping.key.header.eml keyword.other.eml
+        2: punctuation.separator.mapping.key-value.eml
+      set: [expect-body-instructions-quoted-printable, header-value]
+    - include: become-expect-base64
+    - include: generic-header-kvp
+
+  become-expect-base64:
+    - match: ^((?i:Content-Transfer-Encoding))(:)\s*base64\b
+      captures:
+        1: meta.mapping.key.header.eml keyword.other.eml
+        2: punctuation.separator.mapping.key-value.eml
+      set: [expect-body-instructions-base64, header-value]
+
+  expect-body-instructions-base64:
+    - match: ^\n$
+      set: body-content-base64
+    - match: ^((?i:Content-Type))(:)\s*(image/\w+)\b
+      captures:
+        1: meta.mapping.key.header.eml keyword.other.eml
+        2: punctuation.separator.mapping.key-value.eml
+        3: entity.name.enum.eml
+      set: [expect-body-instructions-image, header-value]
+    - include: generic-header-kvp
+
+  expect-body-instructions-image:
+    - match: ^\n$
+      set: body-content-image
+    - include: generic-header-kvp
+
+  expect-body-instructions-headers:
+    - match: ^\n$
+      set: body-content-headers
+    - include: generic-header-kvp
+
+  expect-body-instructions-html-noencoding:
+    - match: ^\n$
+      set: body-content-html
+    - include: become-expect-base64
+    - match: ^((?i:Content-Transfer-Encoding))(:)\s*quoted-printable\b
+      captures:
+        1: meta.mapping.key.header.eml keyword.other.eml
+        2: punctuation.separator.mapping.key-value.eml
+      set: [expect-body-instructions-html-quoted-printable, header-value]
+    - include: generic-header-kvp
+
+  expect-body-instructions-quoted-printable:
+    - match: ^\n$
+      set: body-content-quoted-printable
+    - match: ^((?i:Content-Type))(:)\s*(text/(?:watch-)?html)\b
+      captures:
+        1: meta.mapping.key.header.eml keyword.other.eml
+        2: punctuation.separator.mapping.key-value.eml
+        3: entity.name.enum.eml
+      set: [expect-body-instructions-html-quoted-printable, header-value]
+    - include: generic-header-kvp
+
+  expect-body-instructions-html-quoted-printable:
+    - match: ^\n$
+      set: body-content-html-quoted-printable
+    - include: generic-header-kvp
+
+  body-content-headers:
+    - meta_content_scope: meta.region.body.email
+    - include: pop-before-boundary
+    - include: headers
+
+  body-content-image:
+    - meta_content_scope: meta.region.body.email
+    - include: pop-before-boundary
+    - match: ^{{base64_string}}$\n?
+      scope: meta.block.base64.image.eml string.unquoted.eml
+
+  body-content-html:
+    - meta_content_scope: meta.region.body.email
+    - include: pop-before-boundary
+    - match: ''
+      embed: scope:text.html.basic
+      escape: ^(?=--[a-zA-Z0-9-=_?:]+(--)?$)
+
+  body-content-html-quoted-printable:
+    - meta_content_scope: meta.region.body.email
+    - include: pop-before-boundary
+    - match: ''
+      embed: html-with-quoted-printable
+      escape: ^(?=--[a-zA-Z0-9-=_?:]+(--)?$)
+
+  body-content-quoted-printable:
+    - meta_content_scope: meta.region.body.email
+    - include: pop-before-boundary
+    - include: encoded-words
+    - include: quoted-printable
+    - include: plaintext-blockquote
+    - include: common
+
+  body-content-default:
+    - meta_content_scope: meta.region.body.email
+    - include: pop-before-boundary
+    - include: encoded-words
+    - include: plaintext-blockquote
+    - include: common
+
+    # Hacks to avoid toggling state while scanning message headers.
+    #   It's easier to assume `multipart/*`.
+    - match: ^(?=<\?xml\b)
+      embed: scope:text.xml
+      escape: ^(?=--[a-zA-Z0-9-=_?:]+(--)?$)
+    - match: ^(?=(?:<html|<!DOCTYPE html)\b)
+      embed: scope:text.html.basic
+      escape: ^(?=--[a-zA-Z0-9-=_?:]+(--)?$)
+    - include: base64-line
+
+  body-content-base64:
+    - meta_content_scope: meta.region.body.email
+    - include: pop-before-boundary
+    - include: base64-line
+
+  html-with-quoted-printable:
+    - match: ''
+      push: scope:text.html.basic
+      with_prototype:
+        # Unbreak QP version of `=` in attributes
+        - match: \b=3[dD](?=['"])
+          scope: constant.character.escape.eml punctuation.separator.key-value.html
+          push:
+            - scope:text.html.basic#tag-generic-attribute-value
+        - include: quoted-printable
+
+  base64-line:
     # Content-Transfer-Encoding: base64
     #   VGhpcyB0ZXh0IGlzIGVuY29kZWQsIEl0IHNlZW1zIHdlaXJkLg==
-    - match: "(?x) ^ (?:[A-Za-z0-9+/]{4})+ (?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$"
-      scope: comment
+    - match: ^{{base64_string}}$\n?
+      scope: meta.block.base64.eml string.unquoted.eml
 
-    # Content-Transfer-Encoding: quoted-printable
-    - match: "(?x)=([0-9a-fA-F]{2})"
-      scope: variable.other
+  plaintext-blockquote:
+    # Plaintext replies indented with `>>>`
+    - match: ^>{1,8}
+      scope: punctuation.section.block.begin.eml
 
-    # Encoded-words (https://www.ietf.org/rfc/rfc2047.txt)
-    - match: '(?i)=\?(utf-8|windows-1251)\?B\\?(.*)\?='
-      scope: comment
+  quoted-printable:
+    - match: =[0-9a-fA-F]{2}
+      scope: constant.character.escape.eml
+    - match: =\n
+      scope: punctuation.separator.continuation.eml
 
-    # Timestamps (https://tools.ietf.org/html/rfc5322#section-3.3)
-    - match: '[a-zA-Z]{3},.*[+-][0-9]{4}\s(.{4}\))?'
-      scope: variable.language
+  encoded-words:
+    # https://www.ietf.org/rfc/rfc2047.txt
 
-    # Frontiers
-    #   Content-Type: multipart/mixed; boundary=frontier
-    #   --frontier
-    #   --frontier
-    #   --frontier--
-    - match: "(?ix)boundary=(.+)"
-      scope: constant.character
-
-    - match: "(?ix)^--[a-zA-Z0-9-=_?:]+(--)?$"
-      scope: constant.character
-
-    # HTML (https://github.com/sublimehq/Packages/blob/master/HTML/HTML.sublime-syntax)
-    - match: "^\\s*(?=<)"
-      push: Packages/HTML/HTML.sublime-syntax
-      with_prototype:
-        - match: "(?<=>)\\s*$"
+    # Quoted Printable
+    # =?iso-8859-1?q?this=20is=20some=20text?=
+    - match: (=\?)(?:(utf-8|windows-1251|iso-[a-z0-9-]+\b)(\?))?([qQ])(\?)
+      captures:
+        1: punctuation.definition.string.begin.eml
+        2: entity.name.enum.eml
+        3: punctuation.separator.sequence.eml
+        4: constant.language.eml
+        5: punctuation.separator.sequence.eml
+      push:
+        - match: \?=
+          scope: punctuation.definition.string.end.eml
           pop: true
-        - match: "[.@\"]"
-          pop: false
+        - match: '[ \t]'
+          scope: invalid.illegal.eml
+        - include: quoted-printable
+        # Is trailing newline illegal?
 
-    # JavaScript (https://github.com/sublimehq/Packages/blob/master/JavaScript/JavaScript.sublime-syntax)
-    - match: <script>
-      push: Packages/JavaScript/JavaScript.sublime-syntax
-      with_prototype:
-        - match: (?=</script>)
+    # Base 64
+    # =?iso-8859-1?b?PGh0bWw+CiAg?=
+    - match: (=\?)(utf-8|windows-1251|iso-[a-z0-9-]+\b)(\?)([bB])(\?)
+      captures:
+        1: punctuation.definition.string.begin.eml
+        2: entity.name.enum.eml
+        3: punctuation.separator.sequence.eml
+        4: constant.language.eml
+        5: punctuation.separator.sequence.eml
+      push:
+        - match: \?=
+          scope: punctuation.definition.string.end.eml
           pop: true
+        - match: '{{base64_string}}'
+          scope: meta.block.base64.eml string.unquoted.eml
+        - match: (?:[^\n]|{{base64_char}})
+          scope: invalid.illegal.eml
+        # Is trailing newline illegal?
+
+  common:
+    - include: ip-addresses
+    - include: email-addresses
+    - include: uris
+    - include: timestamps
+
+  timestamps:
+    # https://tools.ietf.org/html/rfc5322#section-3.3
+    - match: \b{{day3}}(,)(?=\s\d{1,2}|$)
+      scope: constant.numeric.date-time.eml
+      captures:
+        1: punctuation.separator.sequence.eml
+      push: maybe-timestamp-day
+    # This one is a little hinky because it attempts to find a timestamp
+    #   when there is a 0-31 number as the last text on a line. Until ST4,
+    #   we don't have the ability to backtrack when the timestamp doesn't
+    #   continue on the next line.
+    - match: \b(?=(?:0?[1-9]|[12]\d|3[01])(?:\s{{month3}}|\s?=?$))
+      push: maybe-timestamp-day
+
+  ignore-qp-newline-pop-nonws:
+    - match: =\n
+      scope: punctuation.separator.continuation.eml
+    - match: (?=\S)
+      pop: true
+
+  maybe-timestamp-day:
+    - meta_content_scope: constant.numeric.date-time.eml
+    - match: \b(?:0?[1-9]|[12]\d|3[01])(?=\s{{month3}}|\s?=?$)
+      set: in-timestamp-month
+    - include: ignore-qp-newline-pop-nonws
+
+  in-timestamp-month:
+    - meta_content_scope: constant.numeric.date-time.eml
+    - match: \b{{month3}}\b
+      set: in-timestamp-year
+    - include: ignore-qp-newline-pop-nonws
+
+  in-timestamp-year:
+    - meta_content_scope: constant.numeric.date-time.eml
+    - match: \b(?:19\d{2}|20\d{2})\b
+      set: in-timestamp-time-of-day
+    - include: ignore-qp-newline-pop-nonws
+
+  in-timestamp-time-of-day:
+    - meta_content_scope: constant.numeric.date-time.eml
+    - match: |-
+        (?x:
+          (?:[01]\d|2[0-3])  # hour
+          (:)
+          (?:[0-5]\d)        # minute
+          (?:
+            (:)
+            (?:[0-5]\d)      # second (optional)
+            (?:
+              (\.)
+              \d{1,4}        # fractional second (not rfc5322)
+            )?
+          )?
+        )
+      captures:
+        1: punctuation.separator.sequence.eml
+        2: punctuation.separator.sequence.eml
+        3: punctuation.separator.decimal.eml
+      set: in-timestamp-zone
+    - include: ignore-qp-newline-pop-nonws
+
+  in-timestamp-zone:
+    - meta_content_scope: constant.numeric.date-time.eml
+    - match: ([+-])(?:0\d{3}|1[0-2]\d{2})
+      scope: constant.numeric.date-time.eml
+      captures:
+        1: keyword.operator.arithmetic.eml
+      pop: true
+    - include: ignore-qp-newline-pop-nonws
+
+  ip-addresses:
+    - match: '(\[){{ipv4}}(\])'
+      scope: constant.numeric.ip-address.v4.eml
+      captures:
+        1: punctuation.definition.constant.begin.eml
+        2: punctuation.definition.constant.end.eml
+    - match: '{{ipv4}}'
+      scope: constant.numeric.ip-address.v4.eml
+    - match: '(\[){{ipv6}}(\])'
+      scope: constant.numeric.ip-address.v6.eml
+      captures:
+        1: punctuation.definition.constant.begin.eml
+        2: punctuation.definition.constant.end.eml
+    - match: '{{ipv6}}'
+      scope: constant.numeric.ip-address.v6.eml
+
+  email-addresses:
+    # john.doe@example.com
+    # <john.doe@example.com>
+    - match: '(<?)mailto:'
+      captures:
+        1: punctuation.definition.string.begin.eml
+      push:
+        - meta_content_scope: markup.underline.link.email.eml
+        - match: (>?)(?=[^\w.@-])
+          captures:
+            1: punctuation.definition.string.end.eml
+          pop: true
+    - match: (<?)((?i:[-a-z0-9._+]+@[-a-z0-9.]+))(>?)
+      captures:
+        1: punctuation.definition.string.begin.eml
+        2: markup.underline.link.email.eml
+        3: punctuation.definition.string.end.eml
+
+  uris:
+    # https://example.com
+    # <https://example.com>
+    - match: (<?)(https?:)
+      captures:
+        1: punctuation.definition.string.begin.eml
+        2: markup.underline.link.url.eml
+      push:
+        - meta_content_scope: markup.underline.link.url.eml
+        - match: (>?)(?=\s)
+          captures:
+            1: punctuation.definition.string.end.eml
+          pop: true
+
+  pop-before-boundary:
+    - match: (?=^--({{boundary_name}})(?:--)?$)
+      pop: true
